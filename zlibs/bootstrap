@@ -35,21 +35,23 @@ bootstrap_complete_base() {
 	bootstrap_tgz_stage3="$R/tmp/bootstrap-${os}-${arch}-stage3.tgz"
 	bootstrap_tgz_stage4="$R/tmp/bootstrap-${os}-${arch}-stage4.tgz"
 
-	if [[ -n "$TAR_STAGE4" && -f "$bootstrap_tgz_stage4" ]]; then
-		notice "using the existing stage4 bootstrap tarball found in $R/tmp"
-		bootstrap_tar_unpack "$bootstrap_tgz_stage4" || {
-			die "failed to extract tarball"
-			zerr
-		}
-		return
-	elif [[ -f "$bootstrap_tgz_stage3" ]]; then
-		notice "using the existing stage3 bootstrap tarball found in $R/tmp"
-		bootstrap_tar_unpack "$bootstrap_tgz_stage3" || {
-			die "failed to extract tarball"
-			zerr
-		}
-		return
-	fi
+        if [[ -n "$TAR_STAGE4" && -f "$bootstrap_tgz_stage4" ]]; then
+                notice "using the existing stage4 bootstrap tarball found in $R/tmp"
+                tar_unpack "$bootstrap_tgz_stage4" "$strapdir" || {
+                        die "failed to extract tarball"
+                        zerr
+                }
+                strapdir_update || zerr
+                return
+        elif [[ -f "$bootstrap_tgz_stage3" ]]; then
+                notice "using the existing stage3 bootstrap tarball found in $R/tmp"
+                tar_unpack "$bootstrap_tgz_stage3" "$strapdir" || {
+                        die "failed to extract tarball"
+                        zerr
+                }
+                strapdir_update || zerr
+                return
+        fi
 
 	notice "running debootstrap stage 1"
 
@@ -103,7 +105,7 @@ EOF
 
 	bootstrap_tar_pack "$bootstrap_tgz_stage3" || zerr
 	# FIXME: program flow \ redundant actions error
-	# the function 'bootstrap_tar_unpack' should be split into two
+	# the function 'bootstrap_tar_unpack' has now been split into two
 	# distinct operations 'tar_unpack' and 'bootstrap_update'
 	if [[ -n "$TAR_STAGE4" ]]; then
                 # if "$bootstrap_tgz_stage4" exists this is never reached
@@ -179,16 +181,36 @@ bootstrap_tar_unpack() {
 	req=(strapdir bootstrap_tgz)
 	ckreq || return 1
 
-	[[ -f "$bootstrap_tgz" ]] || return 1
-	sudo rm -rf "${strapdir}"/*
-        [[ -d "${strapdir}" ]] && sudo rm -rf "${strapdir}"
-	sudo mkdir -p ${strapdir}/{boot,dev,sys,proc}
-	silly
-	sudo tar xfp $bootstrap_tgz -C ${strapdir}
+        tar_unpack "$bootstrap_tgz" "$strapdir" || zerr
+        strapdir_update "$strapdir" || zerr
+}
 
-	conf_print_sourceslist | sudo tee $strapdir/etc/apt/sources.list >/dev/null
+tar_unpack() {
+        fn tar_unpack $@
+        local tgz="$1"
+        local destdir="$2"
+        req=(tgz destdir)
+        ckreq || return 1
 
-	cat <<EOF | sudo tee ${strapdir}/postunpack >/dev/null
+	[[ -f "$tgz" ]] || return 1
+	[[ -d "${destdir}" ]] && sudo rm -rf "${destdir}"
+	sudo mkdir -p ${destdir}
+        sudo tar xfp $tgz -C ${destdir}
+        return 0
+}
+
+strapdir_update() {
+        fn strapdir_update $@
+        req=(strapdir)
+        req+=(inittab bootstrap_tgz_stage4)
+        ckreq || return 1
+
+	[[ -d "${strapdir}" ]] || return 1
+        sudo mkdir -p ${strapdir}/{boot,dev,sys,proc}
+
+        conf_print_sourceslist | sudo tee $strapdir/etc/apt/sources.list >/dev/null
+
+        cat <<EOF | sudo tee ${strapdir}/postunpack >>/dev/null
 #!/bin/sh
 apt-get update
 
@@ -216,28 +238,28 @@ apt-get --yes --force-yes autoremove
 apt-get clean
 EOF
 
-	chroot-script -d postunpack || zerr
+        chroot-script -d postunpack || zerr
 
-	for i in $inittab; do
-		grep -q "^$i" $strapdir/etc/inittab && continue
-		print "$i" | sudo tee -a $strapdir/etc/inittab >/dev/null
-	done || true
+        for i in $inittab; do
+                grep -q "^$i" $strapdir/etc/inittab && continue
+                print "$i" | sudo tee -a $strapdir/etc/inittab >/dev/null
+        done || true
 
-	for i in $custmodules; do
-		grep -q "^$i" $strapdir/etc/modules && continue
-		print "$i" | sudo tee -a $strapdir/etc/modules >/dev/null
-	done || true
+        for i in $custmodules; do
+                grep -q "^$i" $strapdir/etc/modules && continue
+                print "$i" | sudo tee -a $strapdir/etc/modules >/dev/null
+        done || true
 
-        # QUERY: should stale stage4 tar files be erased
-        # even if they are not to be replaced (config changed) ?
-	[[ -n "$TAR_STAGE4" ]] && {
-		# FIXME: only rebuild stage4 tar file if $strapdir changed
-		# or "$bootstrap_tgz_stage4" does not exist
-		[[ -f "$bootstrap_tgz_stage4" ]] && {
-			sudo rm -f "$bootstrap_tgz_stage4"
-		}
-		bootstrap_tar_pack "$bootstrap_tgz_stage4"
-	} || true
+	# QUERY: should stale stage4 tar files be erased
+	# even if they are not to be replaced (config changed) ?
+        [[ -n "$TAR_STAGE4" ]] && {
+                # FIXME: only rebuild stage4 tar file if $strapdir changed
+                # or "$bootstrap_tgz_stage4" does not exist
+                [[ -f "$bootstrap_tgz_stage4" ]] && {
+                        sudo rm -f "$bootstrap_tgz_stage4"
+                }
+                bootstrap_tar_pack "$bootstrap_tgz_stage4"
+        } || true
         return 0
 }
 
