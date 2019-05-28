@@ -101,11 +101,18 @@ EOF
 		chroot-script addcachepubkey || zerr
 	}
 
+	bootstrap_tar_pack "$bootstrap_tgz_stage3" || zerr
+	# FIXME: program flow \ redundant actions error
+	# the function 'bootstrap_tar_unpack' should be split into two
+	# distinct operations 'tar_unpack' and 'bootstrap_update'
 	if [[ -n "$TAR_STAGE4" ]]; then
-		bootstrap_tar_pack   "$bootstrap_tgz_stage3" || zerr
+                # if "$bootstrap_tgz_stage4" exists this is never reached
+                # if "$bootstrap_tgz_stage4" does not exist it is an error
 		bootstrap_tar_unpack "$bootstrap_tgz_stage4" || zerr
 	else
-		bootstrap_tar_pack   "$bootstrap_tgz_stage3" || zerr
+                # untarring the freshly created tar file above is redundant work
+                # bootstrap_tar_unpack useful work is to update the bootstrap
+                # and create bootstrap_tgz_stage4 as required.
 		bootstrap_tar_unpack "$bootstrap_tgz_stage3" || zerr
 	fi
 }
@@ -221,8 +228,17 @@ EOF
 		print "$i" | sudo tee -a $strapdir/etc/modules >/dev/null
 	done || true
 
-	[[ -n "$TAR_STAGE4" ]] && bootstrap_tar_pack "$bootstrap_tgz_stage4" || true
-	return 0
+        # QUERY: should stale stage4 tar files be erased
+        # even if they are not to be replaced (config changed) ?
+	[[ -n "$TAR_STAGE4" ]] && {
+		# FIXME: only rebuild stage4 tar file if $strapdir changed
+		# or "$bootstrap_tgz_stage4" does not exist
+		[[ -f "$bootstrap_tgz_stage4" ]] && {
+			sudo rm -f "$bootstrap_tgz_stage4"
+		}
+		bootstrap_tar_pack "$bootstrap_tgz_stage4"
+	} || true
+        return 0
 }
 
 blend_bootstrap_setup() {
