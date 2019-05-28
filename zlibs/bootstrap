@@ -176,9 +176,10 @@ bootstrap_tar_unpack() {
 		[[ -f "$bootstrap_tgz" ]] || bootstrap_tgz="$bootstrap_tgz_stage3"
 	}
 	sudo rm -rf "${strapdir}"/*
+        [[ -d "${strapdir}" ]] && sudo rm -rf "${strapdir}"
+	sudo mkdir -p ${strapdir}/{boot,dev,sys,proc}
 	silly
 	sudo tar xfp $bootstrap_tgz -C ${strapdir}
-	sudo mkdir -p ${strapdir}/{boot,dev,sys,proc}
 
 	conf_print_sourceslist | sudo tee $strapdir/etc/apt/sources.list >/dev/null
 
