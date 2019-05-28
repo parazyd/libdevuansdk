@@ -37,14 +37,14 @@ bootstrap_complete_base() {
 
 	if [[ -n "$TAR_STAGE4" && -f "$bootstrap_tgz_stage4" ]]; then
 		notice "using the existing stage4 bootstrap tarball found in $R/tmp"
-		bootstrap_tar_unpack "$bootstrap_tgz_stage4" "$strapdir" || {
+		bootstrap_tar_unpack "$bootstrap_tgz_stage4" || {
 			die "failed to extract tarball"
 			zerr
 		}
 		return
 	elif [[ -f "$bootstrap_tgz_stage3" ]]; then
 		notice "using the existing stage3 bootstrap tarball found in $R/tmp"
-		bootstrap_tar_unpack "$bootstrap_tgz_stage3" "$strapdir" || {
+		bootstrap_tar_unpack "$bootstrap_tgz_stage3" || {
 			die "failed to extract tarball"
 			zerr
 		}
@@ -102,11 +102,11 @@ EOF
 	}
 
 	if [[ -n "$TAR_STAGE4" ]]; then
-		bootstrap_tar_pack   "$bootstrap_tgz_stage3"             || zerr
-		bootstrap_tar_unpack "$bootstrap_tgz_stage4" "$strapdir" || zerr
+		bootstrap_tar_pack   "$bootstrap_tgz_stage3" || zerr
+		bootstrap_tar_unpack "$bootstrap_tgz_stage4" || zerr
 	else
-		bootstrap_tar_pack   "$bootstrap_tgz_stage3"             || zerr
-		bootstrap_tar_unpack "$bootstrap_tgz_stage3" "$strapdir" || zerr
+		bootstrap_tar_pack   "$bootstrap_tgz_stage3" || zerr
+		bootstrap_tar_unpack "$bootstrap_tgz_stage3" || zerr
 	fi
 }
 
@@ -172,9 +172,7 @@ bootstrap_tar_unpack() {
 	req=(strapdir bootstrap_tgz)
 	ckreq || return 1
 
-	[[ -n "$TAR_STAGE4" ]] && {
-		[[ -f "$bootstrap_tgz" ]] || bootstrap_tgz="$bootstrap_tgz_stage3"
-	}
+	[[ -f "$bootstrap_tgz" ]] || return 1
 	sudo rm -rf "${strapdir}"/*
         [[ -d "${strapdir}" ]] && sudo rm -rf "${strapdir}"
 	sudo mkdir -p ${strapdir}/{boot,dev,sys,proc}
@@ -224,6 +222,7 @@ EOF
 	done || true
 
 	[[ -n "$TAR_STAGE4" ]] && bootstrap_tar_pack "$bootstrap_tgz_stage4" || true
+	return 0
 }
 
 blend_bootstrap_setup() {
