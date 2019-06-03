@@ -408,6 +408,11 @@ silly() {
 		"Self potato"
 		"god is porco"
 		"A million hamsters are spinning their wheels right now"
+		"Launching global internet Denial Of Service, googling 'GOOGLE'"
+		"These are not the Devs you are looking for"
+		"herding cats..."
+		"Illegitimi non carborundum"
+		"GNU Terry Pratchett"
 	)
 	local rnd=$(shuf -i1-$#funneh -n 1)
 	act "${funneh[$rnd]}"
