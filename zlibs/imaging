@@ -236,14 +236,15 @@ image_raw_mount() {
 
 image_raw_umount() {
 	fn image_raw_umount
-	req=(workdir bootpart rootpart)
+	req=(workdir)
 	ckreq || return 1
 
-	[[ "$bootfs" == none ]] || {
+	mountpoint -q $workdir/mnt/boot && {
 		sudo umount $workdir/mnt/boot && act "unmounted boot partition" || zerr
-		sleep 1
 	}
-	sudo umount $workdir/mnt      && act "unmounted root partition" || zerr
+	mountpoint -q $workdir/mnt && {
+		sudo umount $workdir/mnt      && act "unmounted root partition" || zerr
+	}
 }
 
 image_raw_as_strapdir() {
